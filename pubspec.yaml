@@ -1,0 +1,52 @@
+name: fip_my_version
+description: "A new Flutter project."
+publish_to: 'none'
+version: 0.1.0
+
+environment:
+  sdk: '>=3.2.6 <4.0.0'
+
+dependencies:
+  flutter:
+    sdk: flutter
+  flutter_localizations:
+    sdk: flutter
+  intl: ^0.18.0
+  flutter_downloader: ^1.11.6
+  http:
+  open_file: ^3.3.2
+  provider: ^6.1.1
+  smooth_page_indicator:
+  url_launcher:
+  email_validator: ^2.0.1
+  curved_navigation_bar: ^1.0.3
+  image_picker:
+  path_provider: ^2.1.2
+  file_picker:
+  
+
+dev_dependencies:
+  flutter_test:
+    sdk: flutter
+  flutter_lints: ^2.0.0
+  flutter_launcher_icons: "^0.9.2"
+
+flutter_icons:
+  android: true
+  ios: true
+  image_path: "assets/images/omni_logo.png"
+
+flutter:
+  uses-material-design: true
+  assets:
+    - assets/images/
+    - assets/locales/
+    - assets/fonts/
+    - assets/icon/
+  fonts:
+    - family: K2D
+      fonts:
+        - asset: assets/fonts/K2D-Regular.ttf
+        - asset: assets/fonts/K2D-Bold.ttf
+        - asset: assets/fonts/K2D-Light.ttf
+    
