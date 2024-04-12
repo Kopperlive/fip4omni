@@ -33,7 +33,7 @@ import 'package:fip_my_version/core/core.dart';
 Map<String, String> headers = {
   'Accept': 'application/json',
   'Content-Type': 'application/json',
-  'Access-Control-Allow-Origin': '*',
+  // 'Access-Control-Allow-Origin': '*',
 };
 
 String protocol = 'http';
