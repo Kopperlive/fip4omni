@@ -36,6 +36,7 @@ class _EditProfScreenState extends State<EditProfScreen> {
 
     if (response.statusCode == 200) {
       final userInfo = json.decode(response.body);
+      print(userInfo);
 
       setState(() {
         // Assuming the userInfo map contains all the keys used below

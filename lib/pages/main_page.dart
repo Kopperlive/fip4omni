@@ -291,15 +291,39 @@ class _HomePageState extends State<HomePage> {
   final pageController = PageController();
   late List<Report> reports = [];
   late Map<String, dynamic> userInfo = {};
+  late Map<String, dynamic> status = {};
   int _selectedIndex = 1;
 
   @override
   void initState() {
     super.initState();
+    getStatus();
     getUserInfo();
     loadReports();
   // getImage();
   }
+
+  Future<void> getStatus() async {
+  final response = await http.get(
+    Uri.parse('$protocol://$domain/api/v1/status/'),
+    headers: headers,
+  );
+
+  if (response.statusCode == 200) {
+    List<dynamic> jsonList = json.decode(response.body); // Decoding the response into a List
+
+    Map<String, dynamic> statusMap = {
+      for (var status in jsonList) status['id'].toString(): status
+    };
+
+    setState(() {
+      status = statusMap;
+    });
+    print(status);
+  } else {
+    print('Failed to get status. Status code: ${response.statusCode}');
+  }
+}
   
   Future<void> getUserInfo() async {
     // final response = await http.get(Uri.parse('http://192.168.0.106:8000/api/v1/user/'), headers: headers);
@@ -327,7 +351,10 @@ class _HomePageState extends State<HomePage> {
     List<dynamic> jsonList = json.decode(response.body);
 
     setState(() {
-      reports = jsonList.map((json) => Report.fromJson(json)).toList();
+      reports = jsonList
+          .map((json) => Report.fromJson(json))
+          .where((report) => report.status == 1 || report.status == 2)
+          .toList();
     });
     } else {
     // Handle the error or provide feedback to the user
@@ -517,7 +544,7 @@ class _HomePageState extends State<HomePage> {
                   for (var report in reports)
                   Card(
                     margin: EdgeInsets.symmetric(vertical: 4, horizontal: 30),
-                    color: Color(0xffffffff),
+                    color: report.status == 2 ? Colors.yellow : Colors.white,
                     shadowColor: Color(0xff000000),
                     elevation: 1,
                     shape: RoundedRectangleBorder(

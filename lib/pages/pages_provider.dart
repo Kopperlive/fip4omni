@@ -15,7 +15,7 @@ class _PagesProviderState extends State<PagesProvider> {
 
   // Pages for the PageView
   final List<Widget> _pages = [
-    ChatsScreen(), // Page 1
+    ChatListPage(), // Page 1
     HomePage(),
     SettingsScreen(), // Page 3
   ];

@@ -488,7 +488,7 @@ Future<void> handleSubmit() async {
                 controller: messageController,
                 obscureText: false,
                 textAlign: TextAlign.start,
-                maxLines: 1,
+                maxLines: 15,
                 style: TextStyle(
                   fontWeight: FontWeight.w400,
                   fontStyle: FontStyle.normal,
@@ -499,7 +499,7 @@ Future<void> handleSubmit() async {
                   disabledBorder: InputBorder.none,
                   focusedBorder: InputBorder.none,
                   enabledBorder: InputBorder.none,
-                  hintText: "White message",
+                  hintText:   "White message",
                   hintStyle: TextStyle(
                     fontWeight: FontWeight.w400,
                     fontStyle: FontStyle.normal,

@@ -113,9 +113,14 @@ class MyApp extends StatelessWidget {
               '/privacyPolicy': (context) => PrivacyPolicyScreen(),
               '/changePassword': (context) => ChangePassword(),
               // '/aboutUs': (context) => AboutUsScreen(),
-              '/chatsScreen': (context) => ChatsScreen(),
-              '/chatScreen': (context) => ChatPage(),
+              '/chatsScreen': (context) => ChatListPage(),
+              '/chatScreen': (context) {
+                final args = ModalRoute.of(context)!.settings.arguments as Map<String, dynamic>;
+                return ChatPage(chatId: args['chatId'], chatName: args['chatName'], userId: args['userId']);
+              },
               '/createReport': (context) => CreateReport(),
+              '/createChat': (context) => CreateChatPage(),
+              '/historyOfReports':(context) => HistoryOfReportsPage(),
               // Add other routes here
             },
           );

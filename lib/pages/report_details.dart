@@ -14,36 +14,70 @@ class ReportDetails extends StatefulWidget {
 
 class _ReportDetailsState extends State<ReportDetails> {
   late Future<Report> reportDetails;
+  late Map<String, dynamic> status = {};
+  int? selectedStatus;
 
   @override
   void initState() {
     super.initState();
     reportDetails = getReportDetails(widget.reportId);
+    getStatus();
   }
 
-  Future<Report> getReportDetails(int reportId) async {
-    final response = await http.get(
-      Uri.parse('$protocol://$domain/api/v1/report/$reportId'),
-      headers: headers,
-    );
+  Future<void> getStatus() async {
+  final response = await http.get(
+    Uri.parse('$protocol://$domain/api/v1/status/'),
+    headers: headers,
+  );
 
-    if (response.statusCode == 200) {
-      var reportJson = json.decode(response.body);
-      // Assuming the 'files' field contains a list of file IDs
-      List<ReportFile> reportFiles = await Future.wait(
-        (reportJson['files'] as List).map((fileId) => getFileDetails(fileId)).toList(),
-      );
-      return Report(
-        id: reportJson['id'],
-        title: reportJson['title'],
-        text: reportJson['text'],
-        files: reportFiles,
-        recipients: List<String>.from(reportJson['recipients']),
-        deadline: DateTime.parse(reportJson['deadline']),
-      );
-    } else {
-      throw Exception('Failed to load report details. Status code: ${response.statusCode}');
-    }
+  if (response.statusCode == 200) {
+    List<dynamic> jsonList = json.decode(response.body);
+
+    Map<String, dynamic> statusMap = {
+      for (var status in jsonList) status['id'].toString(): status
+    };
+
+    setState(() {
+      status = statusMap;
+    });
+    print(status);
+  } else {
+    print('Failed to get status. Status code: ${response.statusCode}');
+  }
+}
+
+  Future<Report> getReportDetails(int reportId) async {
+  final response = await http.get(
+    Uri.parse('$protocol://$domain/api/v1/report/$reportId'),
+    headers: headers,
+  );
+
+  if (response.statusCode == 200) {
+    var reportJson = json.decode(response.body);
+
+    var fileFutures = (reportJson['files'] as List)
+        .map<Future<ReportFile>>((fileId) => getFileDetails(fileId))
+        .toList();
+
+    List<ReportFile> reportFiles = await Future.wait(fileFutures);
+
+    return Report(
+      id: reportJson['id'] as int,
+      title: reportJson['title'] as String,
+      text: reportJson['text'] as String,
+      files: reportFiles,
+      recipients: List<String>.from(reportJson['recipients']),
+      createdAt: DateTime.parse(reportJson['created_at']),
+      updatedAt: DateTime.parse(reportJson['updated_at']),
+      deletedAt: reportJson['deleted_at'] != null
+          ? DateTime.parse(reportJson['deleted_at'])
+          : null,
+      deadline: reportJson['deadline'],
+      status: reportJson['status'] as int,
+    );
+  } else {
+    throw Exception('Failed to load report details. Status code: ${response.statusCode}');
+  }
   }
 
   Future<ReportFile> getFileDetails(int fileId) async {
@@ -60,9 +94,30 @@ class _ReportDetailsState extends State<ReportDetails> {
     }
   }
 
+  Future<void> updateStatus(int reportId, int statusId) async {
+    final response = await http.patch(
+      Uri.parse('$protocol://$domain/api/v1/report/$reportId'),
+      headers: headers,
+      body: json.encode({
+        'status': statusId,
+      }),
+    );
+
+    if (response.statusCode == 200) {
+      // If the server returns an OK response, refresh the report details.
+      setState(() {
+        reportDetails = getReportDetails(widget.reportId);
+      });
+    } else {
+      // If the server did not return a 200 OK response,
+      // then throw an exception.
+      throw Exception('Failed to update report status. Status code: ${response.statusCode}');
+    }
+  }
+
   void downloadFile(String fileUrl) async {
-    if (await canLaunch(fileUrl)) {
-      await launch(fileUrl);
+    if (await canLaunchUrl(Uri.parse(fileUrl))) {
+      await launchUrl(Uri.parse(fileUrl));
     } else {
       throw 'Could not launch $fileUrl';
     }
@@ -119,6 +174,31 @@ class _ReportDetailsState extends State<ReportDetails> {
                         padding: const EdgeInsets.all(8.0),
                         child: Text('Recipients: ${report.recipients.join(', ')}'),
                       ),
+                      DropdownButtonFormField<int>(
+                    value: selectedStatus,
+                    items: status.entries
+                        .map<DropdownMenuItem<int>>((entry) => DropdownMenuItem(
+                              value: int.parse(entry.key),
+                              child: Text(entry.value),
+                            ))
+                        .toList(),
+                    onChanged: (int? newValue) {
+                      if (newValue != null) {
+                        setState(() {
+                          selectedStatus = newValue;
+                        });
+                        updateStatus(report.id, newValue);
+                      }
+                    },
+                    decoration: InputDecoration(
+                      labelText: "Update Status",
+                      filled: true,
+                      fillColor: Colors.white,
+                      border: OutlineInputBorder(
+                        borderRadius: BorderRadius.circular(10.0),
+                      ),
+                    ),
+                  ),
                   ],
                 ),
               ),
@@ -131,12 +211,16 @@ class _ReportDetailsState extends State<ReportDetails> {
 }
 
 class Report {
-  final int id;
-  final String title;
-  final String text;
-  final List<ReportFile> files; // Now using ReportFile class to include file details
-  final List<String> recipients;
-  final DateTime deadline;
+  int id;
+  String title;
+  String text;
+  List<ReportFile> files;
+  List<String> recipients;
+  DateTime createdAt;
+  DateTime updatedAt;
+  DateTime? deletedAt;
+  String deadline;
+  int status;
 
   Report({
     required this.id,
@@ -144,14 +228,35 @@ class Report {
     required this.text,
     required this.files,
     required this.recipients,
+    required this.createdAt,
+    required this.updatedAt,
+    this.deletedAt,
     required this.deadline,
+    required this.status,
   });
+
+  factory Report.fromJson(Map<String, dynamic> json) {
+    return Report(
+      id: json['id'] as int,
+      title: json['title'] as String,
+      text: json['text'] as String,
+      files: (json['files'] as List<dynamic>)
+          .map((fileId) => ReportFile.fromId(fileId as int))
+          .toList(),
+      recipients: List<String>.from(json['recipients']),
+      createdAt: DateTime.parse(json['created_at']),
+      updatedAt: DateTime.parse(json['updated_at']),
+      deletedAt: json['deleted_at'] != null ? DateTime.parse(json['deleted_at']) : null,
+      deadline: json['deadline'],
+      status: json['status'] as int,
+    );
+  }
 }
 
 class ReportFile {
   final int id;
-  final String name; // name of the file
-  final String fileUrl; // the URL for downloading the file
+  final String name;
+  final String fileUrl;
 
   ReportFile({
     required this.id,
@@ -160,14 +265,18 @@ class ReportFile {
   });
 
   factory ReportFile.fromJson(Map<String, dynamic> json) {
-    String url = json['file']; // assuming 'file' is the key for the file URL
-    String fileName = url.split('/').last; // Extracting the file name from URL
-
     return ReportFile(
-      id: json['id'],
-      name: fileName,
-      fileUrl: url,
+      id: json['id'] as int,
+      name: json['name'] as String,
+      fileUrl: json['file'] as String,
+    );
+  }
+
+  factory ReportFile.fromId(int id) {
+    return ReportFile(
+      id: id,
+      name: 'File $id',
+      fileUrl: 'path/to/file/$id',
     );
   }
 }
-

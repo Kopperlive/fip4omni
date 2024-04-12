@@ -24,6 +24,8 @@ export 'package:fip_my_version/pages/pages_provider.dart';
 export 'package:fip_my_version/pages/chats_screen.dart';
 export 'package:fip_my_version/pages/chat_screen.dart';
 export 'package:fip_my_version/pages/create_report.dart';
+export 'package:fip_my_version/pages/create_chat.dart';
+export 'package:fip_my_version/pages/history_of_reports.dart';
 
 
 import 'package:fip_my_version/core/core.dart';
@@ -31,6 +33,7 @@ import 'package:fip_my_version/core/core.dart';
 Map<String, String> headers = {
   'Accept': 'application/json',
   'Content-Type': 'application/json',
+  'Access-Control-Allow-Origin': '*',
 };
 
 String protocol = 'http';
@@ -51,6 +54,7 @@ class Report {
   String title;
   String text;
   List<int> files;
+  // String sender;
   List<String> recipients;
   DateTime createdAt;
   DateTime updatedAt;
@@ -63,6 +67,7 @@ class Report {
     required this.title,
     required this.text,
     required this.files,
+    // required this.sender,
     required this.recipients,
     required this.createdAt,
     required this.updatedAt,
@@ -77,6 +82,7 @@ class Report {
       title: json['title'] as String,
       text: json['text'] as String,
       files: List<int>.from(json['files']),
+      // sender: json['sender'],
       recipients: List<String>.from(json['recipients']),
       createdAt: DateTime.parse(json['created_at']),
       updatedAt: DateTime.parse(json['updated_at']),
@@ -101,15 +107,17 @@ class ReportsList {
 
 
 class UserProfile {
+  int id;
   String name;
   String email;
   String phoneNumber;
   String country;
   String gender;
   String telegramNickname;
-  String imageUrl; // Added for profile image
+  String imageUrl;
 
   UserProfile({
+    required this.id,
     required this.name,
     required this.email,
     required this.phoneNumber,
@@ -122,31 +130,34 @@ class UserProfile {
 
 class ProfileManager {
   static UserProfile userProfile = UserProfile(
+    id: 2,
     name: "Turdieva Dilnaza Dilmuratovna",
     email: "turdieva_d@auca.kg",
     phoneNumber: "+996 555 555 555",
     country: "kyrgyzstan",
     gender: "female",
     telegramNickname: "@yorunmichi",
-    imageUrl: 'https://i.redd.it/3ntdykbuoi271.jpg', // Initial imageUrl is null
+    imageUrl: 'https://i.redd.it/3ntdykbuoi271.jpg',
   );
 
   static void updateProfile({
+    int? id,
     String? email,
     String? phoneNumber,
     String? country,
     String? gender,
     String? telegramNickname,
-    String? imageUrl, // Add imagePath parameter
+    String? imageUrl,
   }) {
     userProfile = UserProfile(
+      id: id ?? userProfile.id,
       name: userProfile.name,
       email: email ?? userProfile.email,
       phoneNumber: phoneNumber ?? userProfile.phoneNumber,
       country: country ?? userProfile.country,
       gender: gender ?? userProfile.gender,
       telegramNickname: telegramNickname ?? userProfile.telegramNickname,
-      imageUrl: imageUrl ?? userProfile.imageUrl, // Update imagePath
+      imageUrl: imageUrl ?? userProfile.imageUrl,
     );
   }
 }
@@ -154,38 +165,30 @@ class ProfileManager {
 
 
 class Chat {
-  final String id;
-  final DateTime created;
-  final DateTime updated;
-  final DateTime deleted;
-  final String header;
+  final int id;
+  final DateTime createdAt;
+  final DateTime updatedAt;
+  final DateTime? deletedAt;
+  final String title;
   final List<int> participants;
-  final List<Message> messages;
-  final String imageUrl; // Added imageUrl field
 
   Chat({
     required this.id,
-    required this.created,
-    required this.updated,
-    required this.deleted,
-    required this.header,
+    required this.createdAt,
+    required this.updatedAt,
+    this.deletedAt,
+    required this.title,
     required this.participants,
-    required this.messages,
-    required this.imageUrl, // Initialize imageUrl in the constructor
   });
 
   factory Chat.fromJson(Map<String, dynamic> json) {
     return Chat(
-      id: json['ID'],
-      created: DateTime.parse(json['created']),
-      updated: DateTime.parse(json['updated']),
-      deleted: DateTime.parse(json['deleted']),
-      header: json['header'],
-      participants: List<int>.from(json['participants']),
-      messages: (json['last message'] as List)
-          .map((messageJson) => Message.fromJson(messageJson))
-          .toList(),
-      imageUrl: json['imageUrl'], // Extract imageUrl from JSON
+      id: json['id'],
+      createdAt: DateTime.parse(json['created_at']),
+      updatedAt: DateTime.parse(json['updated_at']),
+      deletedAt: json['deleted_at'] != null ? DateTime.parse(json['deleted_at']) : null,
+      title: json['title'],
+      participants: json['participants'].cast<int>(),
     );
   }
 }
@@ -194,19 +197,19 @@ class Message {
   final int id;
   final DateTime createdAt;
   final DateTime updatedAt;
-  final DateTime deletedAt;
+  final DateTime? deletedAt;
   final String text;
-  final int user;
-  final int chat;
+  final int userId;
+  final int chatId;
 
   Message({
     required this.id,
     required this.createdAt,
     required this.updatedAt,
-    required this.deletedAt,
+    this.deletedAt,
     required this.text,
-    required this.user,
-    required this.chat,
+    required this.userId,
+    required this.chatId,
   });
 
   factory Message.fromJson(Map<String, dynamic> json) {
@@ -214,10 +217,11 @@ class Message {
       id: json['id'],
       createdAt: DateTime.parse(json['created_at']),
       updatedAt: DateTime.parse(json['updated_at']),
-      deletedAt: DateTime.parse(json['deleted_at']),
+      deletedAt: json['deleted_at'] != null ? DateTime.parse(json['deleted_at']) : null,
       text: json['text'],
-      user: json['user'],
-      chat: json['chat'],
+      userId: json['user'],
+      chatId: json['chat'],
     );
   }
 }
+

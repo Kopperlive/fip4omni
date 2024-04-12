@@ -36,7 +36,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
 
   Future<void> signOut() async {
   final response = await http.post(
-    Uri.parse('$protocol://$domain/api/v1/user/sign_out'),
+    Uri.parse('$protocol://$domain/api/v1/user/sign_out/'),
     headers: headers,
     body: jsonEncode({}), // If an empty object is required, send an empty JSON object.
   );
@@ -198,6 +198,32 @@ class _SettingsScreenState extends State<SettingsScreen> {
                       ),
                     ),
                   ),
+                  MaterialButton(
+                    onPressed: () {
+                      Navigator.pushNamed(context, '/historyOfReports');
+                    },
+                    color: backgroundColor,
+                    elevation: 0,
+                    shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.zero,
+                    ),
+                    padding: EdgeInsets.fromLTRB(30, 20, 0, 20),
+                    textColor: fontColor,
+                    height: 40,
+                    minWidth: MediaQuery.of(context).size.width,
+                    child: Align(
+                    alignment: Alignment.centerLeft,
+                      child: Text(
+                        // AppLocalizations.of(context).translate('edit_profile'),
+                        'History of your reports',
+                        style: const TextStyle(
+                          fontSize: 14,
+                          fontWeight: FontWeight.w400,
+                          fontStyle: FontStyle.normal,
+                        ),
+                      ),
+                  ),
+              ),
                   MaterialButton(
                     onPressed: () {
                       Navigator.pushNamed(context, '/editProfile');
