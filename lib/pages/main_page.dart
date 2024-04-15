@@ -352,9 +352,7 @@ class _HomePageState extends State<HomePage> {
 
     setState(() {
       reports = jsonList
-          .map((json) => Report.fromJson(json))
-          .where((report) => report.status == 1 || report.status == 2)
-          .toList();
+          .map((json) => Report.fromJson(json)).where((report) => report.status == 3).toList();
     });
     } else {
     // Handle the error or provide feedback to the user

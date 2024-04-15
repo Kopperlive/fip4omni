@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:http/http.dart' as http;
+import 'package:intl/intl.dart'; 
 import 'package:fip_my_version/core/core.dart';
 
 class HistoryOfReportsPage extends StatefulWidget {
@@ -10,6 +11,10 @@ class HistoryOfReportsPage extends StatefulWidget {
 class _HistoryOfReportsPageState extends State<HistoryOfReportsPage> {
   late Map<String, dynamic> userInfo = {};
   late List<Report> reports = [];
+  late List<Report> filteredReports = [];
+  Map<int, bool> selectedStatusFilters = {};
+  DateTime? startDateFilter;
+  DateTime? endDateFilter;
 
   @override
   void initState() {
@@ -19,220 +24,169 @@ class _HistoryOfReportsPageState extends State<HistoryOfReportsPage> {
   }
 
   Future<void> getUserInfo() async {
-    // final response = await http.get(Uri.parse('http://192.168.0.106:8000/api/v1/user/'), headers: headers);
     final response = await http.get(Uri.parse('$protocol://$domain/api/v1/user/'), headers: headers);
-
     if (response.statusCode == 200) {
-      Map<String, dynamic> jsonMap = json.decode(response.body);
-
-      setState((){
-        userInfo = jsonMap;
-
-        print(userInfo);
+      setState(() {
+        userInfo = json.decode(response.body);
       });
-    }
-    else {
-      print('Failed to get full name. Status code: ${response.statusCode}');
+    } else {
+      print('Failed to get user info. Status code: ${response.statusCode}');
     }
   }
 
   Future<void> loadReports() async {
-  // final response = await http.get(Uri.parse('https://user121459.pythonanywhere.com/api/v1/report/'), headers: headers);
-  final response = await http.get(Uri.parse('$protocol://$domain/api/v1/report/'), headers: headers);
-  print(response.body);
-  if (response.statusCode == 200) {
-    List<dynamic> jsonList = json.decode(response.body);
-
-    setState(() {
-      reports = jsonList
-          .map((json) => Report.fromJson(json))
-          .toList();
-    });
+    final response = await http.get(Uri.parse('$protocol://$domain/api/v1/report/'), headers: headers);
+    if (response.statusCode == 200) {
+      List<dynamic> jsonList = json.decode(response.body);
+      setState(() {
+        reports = jsonList.map((json) => Report.fromJson(json)).toList();
+        applyFilters(); 
+      });
     } else {
-    // Handle the error or provide feedback to the user
-    print('Failed to load reports. Status code: ${response.statusCode}');
+      print('Failed to load reports. Status code: ${response.statusCode}');
+    }
   }
-}
-Color _getCardColor(int status) {
-    switch (status) {
-      case 1:
-        return Colors.white;
-      case 2:
-        return Colors.yellow;
-      case 3:
-        return Colors.green;
-      case 4:
-        return Colors.red;
-      default:
-        return Colors.white;
+
+  void applyFilters() {
+    setState(() {
+      filteredReports = reports.where((report) {
+        bool dateFilterCheck = startDateFilter != null && endDateFilter != null &&
+                               report.createdAt.isAfter(startDateFilter!) &&
+                               report.createdAt.isBefore(endDateFilter!);
+        bool statusFilterCheck = selectedStatusFilters.entries.any((entry) => entry.value && report.status == entry.key);
+        return dateFilterCheck && statusFilterCheck;
+      }).toList();
+    });
+  }
+
+  void toggleStatusFilter(int status) {
+    setState(() {
+      selectedStatusFilters[status] = !(selectedStatusFilters[status] ?? false);
+      applyFilters();
+    });
+  }
+
+  Future<void> selectDate(BuildContext context, bool isStart) async {
+    final DateTime? picked = await showDatePicker(
+      context: context,
+      initialDate: (isStart ? startDateFilter : endDateFilter) ?? DateTime.now(),
+      firstDate: DateTime(2000),
+      lastDate: DateTime(2100),
+    );
+    if (picked != null) {
+      setState(() {
+        if (isStart) {
+          startDateFilter = picked;
+        } else {
+          endDateFilter = picked;
+        }
+        applyFilters();
+      });
     }
   }
 
   @override
   Widget build(BuildContext context) {
-    final themeProvider = Provider.of<ThemeProvider>(context);
-    Color backgroundColor = themeProvider.isDarkMode
-        ? Color.fromRGBO(21, 21, 21, 1)
-        : Colors.white;
-    Color fontColor = themeProvider.isDarkMode
-        ? Colors.white
-        : Colors.black;
     return Scaffold(
-      backgroundColor: backgroundColor,
-      // bottomNavigationBar: BottomBar(
-      // selectedIndex: _selectedIndex,
-      // onTabSelected: _onItemTapped,
-    // ),
+      appBar: AppBar(title: Text('History of Reports')),
       body: SingleChildScrollView(
         child: Column(
-          mainAxisAlignment: MainAxisAlignment.start,
-          crossAxisAlignment: CrossAxisAlignment.center,
-          mainAxisSize: MainAxisSize.max,
           children: [
-            Container(
-              alignment: Alignment.center,
-              margin: EdgeInsets.all(0),
-              padding: EdgeInsets.all(0),
-              width: MediaQuery.of(context).size.width,
-              height: MediaQuery.of(context).size.height * 0.15,
-              decoration: BoxDecoration(
-                color: Color(0xff000000),
-                shape: BoxShape.rectangle,
-                borderRadius: BorderRadius.zero,
-                border: Border.all(color: Color(0x4d9e9e9e), width: 1),
-              ),
-              child: Row(
-                mainAxisAlignment: MainAxisAlignment.start,
-                crossAxisAlignment: CrossAxisAlignment.center,
-                mainAxisSize: MainAxisSize.max,
-                children: [
-                  Row(
-                    mainAxisAlignment: MainAxisAlignment.start,
-                    crossAxisAlignment: CrossAxisAlignment.center,
-                    mainAxisSize: MainAxisSize.max,
-                    children: [
-                      Padding(
-                        padding: EdgeInsets.fromLTRB(20, 0, 5, 0),
-                        child:
-
-                            ///***If you have exported images you must have to copy those images in assets/images directory.
-                            Image(
-                          image: const AssetImage("assets/images/omni_logo_sign_in.png"),
-                          height: 100,
-                          width: MediaQuery.of(context).size.width * 0.1,
-                          fit: BoxFit.contain,
-                        ),
-                      ),
-                    ],
-                  ),
-                  Expanded(
-                    flex: 1,
-                    child: Align(
-                      alignment: Alignment(0.0, 0.0),
-                      child: Text(
-                        (userInfo['last_name'] ?? '') + ' ' + (userInfo['first_name'] ?? '') + ' ' + (userInfo['middle_name'] ?? ''),
-                        textAlign: TextAlign.center,
-                        overflow: TextOverflow.clip,
-                        style: const TextStyle(
-                          fontWeight: FontWeight.w400,
-                          fontStyle: FontStyle.normal,
-                          fontSize: 24,
-                          color: Color(0xffffffff),
-                        ),
-                      ),
-                    ),
-                  ),
-                ],
-              ),
-            ),
-            Padding(
-              padding: EdgeInsets.fromLTRB(0, 15, 0, 0),
-              child: Column(
-                mainAxisAlignment: MainAxisAlignment.start,
-                crossAxisAlignment: CrossAxisAlignment.center,
-                mainAxisSize: MainAxisSize.max,
-                children: [
-                  for (var report in reports)
-                  Card(
-                    margin: EdgeInsets.symmetric(vertical: 4, horizontal: 30),
-                    color: _getCardColor(report.status),
-                    shadowColor: Color(0xff000000),
-                    elevation: 1,
-                    shape: RoundedRectangleBorder(
-                      borderRadius: BorderRadius.circular(5.0),
-                      side: BorderSide(color: Color(0x4d9e9e9e), width: 1),
-                    ),
-                    child: Padding(
-                      padding: EdgeInsets.all(10),
-                      child: Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          Text(
-                            report.title,
-                            style: TextStyle(
-                              fontWeight: FontWeight.w600,
-                              fontSize: 16,
-                              color: Color(0xff000000),
-                            ),
-                          ),
-                          SizedBox(height: 8),
-                          Text(
-                            'Deadline: ${report.deadline}',
-                            style: TextStyle(
-                              fontWeight: FontWeight.w400,
-                              fontSize: 14,
-                              color: Color(0xff6c6c6c),
-                            ),
-                          ),
-                          SizedBox(height: 8),
-                          Text(
-                            'Files: ${report.files.length}',
-                            style: TextStyle(
-                              fontWeight: FontWeight.w400,
-                              fontSize: 14,
-                              color: Color(0xff6c6c6c),
-                            ),
-                          ),
-                          SizedBox(height: 8),
-                          Text(
-                            'Sender: ${report.recipients.join(", ")}',
-                            style: TextStyle(
-                              fontWeight: FontWeight.w400,
-                              fontSize: 14,
-                              color: Color(0xff6c6c6c),
-                            ),
-                          ),
-                          SizedBox(height: 8),
-                          Align(
-                            alignment: Alignment.centerRight,
-                            child: TextButton(
-                              onPressed: () {
-                                // Navigate to the report details page
-                                Navigator.push(
-                                  context,
-                                  MaterialPageRoute(
-                                    builder: (context) => ReportDetails(reportId: report.id),
-                                  ),
-                                );
-                              },
-                              child: Text(
-                                'View Details',
-                                style: TextStyle(
-                                  color: Color(0xfffb8b25),
-                                ),
-                              ),
-                            ),
-                          ),
-                        ],
-                      ),
-                    ),
-                  ),
-                ],
-              ),
-            ),
+            userInfoSection(),
+            filterSection(),
+            reportsList(),
           ],
         ),
-      )
+      ),
     );
+  }
+
+  Widget userInfoSection() {
+    return Container(
+      alignment: Alignment.center,
+      padding: EdgeInsets.symmetric(vertical: 20),
+      child: Text(
+        "${userInfo['last_name'] ?? ''} ${userInfo['first_name'] ?? ''} ${userInfo['middle_name'] ?? ''}",
+        style: TextStyle(fontWeight: FontWeight.bold, fontSize: 20),
+      ),
+    );
+  }
+
+  Widget filterSection() {
+    return Column(
+      children: [
+        Wrap(
+          children: List.generate(3, (index) => filterChip(3 + index, ['In Process', 'Not Completed', 'Completed'][index], [Colors.yellow, Colors.red, Colors.green][index])),
+        ),
+        datePickerRow(),
+      ],
+    );
+  }
+
+  Widget datePickerRow() {
+    return Row(
+      mainAxisAlignment: MainAxisAlignment.spaceEvenly,
+      children: [
+        ElevatedButton(
+          onPressed: () => selectDate(context, true),
+          child: Text('Start Date: ${startDateFilter != null ? DateFormat('yyyy-MM-dd').format(startDateFilter!) : 'Select'}'),
+        ),
+        ElevatedButton(
+          onPressed: () => selectDate(context, false),
+          child: Text('End Date: ${endDateFilter != null ? DateFormat('yyyy-MM-dd').format(endDateFilter!) : 'Select'}'),
+        ),
+      ],
+    );
+  }
+
+  Widget filterChip(int status, String label, Color color) {
+    return FilterChip(
+      label: Text(label),
+      backgroundColor: color.withOpacity(0.3),
+      selectedColor: color,
+      checkmarkColor: Colors.white,
+      selected: selectedStatusFilters[status] ?? false,
+      onSelected: (bool isSelected) => toggleStatusFilter(status),
+    );
+  }
+
+  Widget reportsList() {
+    return Column(
+      children: filteredReports.map((report) => reportCard(report)).toList(),
+    );
+  }
+
+
+Widget reportCard(Report report) {
+  return Card(
+    color: _getCardColor(report.status),
+    child: ListTile(
+      title: Text(report.title),
+      subtitle: Text('Deadline: ${DateFormat('yyyy-MM-dd').format(report.deadline)}'),
+      trailing: IconButton(
+        icon: Icon(Icons.arrow_forward),
+        onPressed: () {
+          Navigator.push(
+            context,
+            MaterialPageRoute(builder: (context) => ReportDetails(reportId: report.id)),
+          );
+        },
+      ),
+    ),
+  );
+}
+
+
+  Color _getCardColor(int status) {
+    switch (status) {
+      case 3:
+        return Colors.yellow.shade200;
+      case 4:
+        return Colors.red.shade200;
+      case 5:
+        return Colors.green.shade200;
+      default:
+        return Colors.grey.shade200;
+    }
   }
 }

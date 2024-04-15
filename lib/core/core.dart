@@ -29,14 +29,14 @@ export 'package:fip_my_version/pages/history_of_reports.dart';
 
 
 import 'package:fip_my_version/core/core.dart';
+import 'package:intl/intl.dart';
 
 Map<String, String> headers = {
   'Accept': 'application/json',
-  'Content-Type': 'application/json',
-  // 'Access-Control-Allow-Origin': '*',
+  'Content-Type': 'application/json',  
 };
 
-String protocol = 'http';
+String protocol = 'https';
 
 String domain = 'user121459.pythonanywhere.com';
 
@@ -54,12 +54,11 @@ class Report {
   String title;
   String text;
   List<int> files;
-  // String sender;
   List<String> recipients;
   DateTime createdAt;
   DateTime updatedAt;
   DateTime? deletedAt;
-  String deadline;
+  DateTime deadline;
   int status;
 
   Report({
@@ -67,7 +66,6 @@ class Report {
     required this.title,
     required this.text,
     required this.files,
-    // required this.sender,
     required this.recipients,
     required this.createdAt,
     required this.updatedAt,
@@ -81,17 +79,17 @@ class Report {
       id: json['id'] as int,
       title: json['title'] as String,
       text: json['text'] as String,
-      files: List<int>.from(json['files']),
-      // sender: json['sender'],
-      recipients: List<String>.from(json['recipients']),
-      createdAt: DateTime.parse(json['created_at']),
-      updatedAt: DateTime.parse(json['updated_at']),
-      deletedAt: json['deleted_at'] != null ? DateTime.parse(json['deleted_at']) : null,
-      deadline: json['deadline'],
+      files: List<int>.from(json['files'] as List),
+      recipients: List<String>.from(json['recipients'] as List),
+      createdAt: DateTime.parse(json['created_at'] as String),
+      updatedAt: DateTime.parse(json['updated_at'] as String),
+      deletedAt: json['deleted_at'] != null ? DateTime.parse(json['deleted_at'] as String) : null,
+      deadline: DateTime.parse(json['deadline'] as String),
       status: json['status'] as int,
     );
   }
 }
+
 
 
 class ReportsList {

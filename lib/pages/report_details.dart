@@ -1,7 +1,9 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/widgets.dart';
 import 'package:http/http.dart' as http;
-import 'package:url_launcher/url_launcher.dart';
 import 'package:fip_my_version/core/core.dart';
+import 'package:path/path.dart' as p;
+import 'package:path_provider/path_provider.dart';
 
 class ReportDetails extends StatefulWidget {
   final int reportId;
@@ -47,42 +49,38 @@ class _ReportDetailsState extends State<ReportDetails> {
 }
 
   Future<Report> getReportDetails(int reportId) async {
-  final response = await http.get(
-    Uri.parse('$protocol://$domain/api/v1/report/$reportId'),
-    headers: headers,
-  );
-
-  if (response.statusCode == 200) {
-    var reportJson = json.decode(response.body);
-
-    var fileFutures = (reportJson['files'] as List)
-        .map<Future<ReportFile>>((fileId) => getFileDetails(fileId))
-        .toList();
-
-    List<ReportFile> reportFiles = await Future.wait(fileFutures);
-
-    return Report(
-      id: reportJson['id'] as int,
-      title: reportJson['title'] as String,
-      text: reportJson['text'] as String,
-      files: reportFiles,
-      recipients: List<String>.from(reportJson['recipients']),
-      createdAt: DateTime.parse(reportJson['created_at']),
-      updatedAt: DateTime.parse(reportJson['updated_at']),
-      deletedAt: reportJson['deleted_at'] != null
-          ? DateTime.parse(reportJson['deleted_at'])
-          : null,
-      deadline: reportJson['deadline'],
-      status: reportJson['status'] as int,
+    final response = await http.get(
+      Uri.parse('$protocol://$domain/api/v1/report/$reportId'),
+      headers: headers,
     );
-  } else {
-    throw Exception('Failed to load report details. Status code: ${response.statusCode}');
-  }
+
+    if (response.statusCode == 200) {
+      var reportJson = json.decode(response.body);
+
+      List<ReportFile> reportFiles = await Future.wait(
+        (reportJson['files'] as List).map((fileId) async => await getFileDetails(fileId))
+      );
+
+      return Report(
+        id: reportJson['id'] ?? -1, // Assuming -1 is an invalid ID
+        title: reportJson['title'] ?? 'No Title',
+        text: reportJson['text'] ?? 'No Description',
+        files: reportFiles,
+        recipients: List<String>.from(reportJson['recipients'] ?? []),
+        createdAt: reportJson['created_at'] != null ? DateTime.parse(reportJson['created_at']) : DateTime.now(),
+        updatedAt: reportJson['updated_at'] != null ? DateTime.parse(reportJson['updated_at']) : DateTime.now(),
+        deletedAt: reportJson['deleted_at'] != null ? DateTime.parse(reportJson['deleted_at']) : null,
+        deadline: reportJson['deadline'] != null ? DateTime.parse(reportJson['deadline']) : DateTime.now(),
+        status: reportJson['status'] ?? 0,
+      );
+    } else {
+      throw Exception('Failed to load report details. Status code: ${response.statusCode}');
+    }
   }
 
   Future<ReportFile> getFileDetails(int fileId) async {
     final response = await http.get(
-      Uri.parse('$protocol://$domain/api/v1/file/$fileId'),
+      Uri.parse('$protocol://$domain/api/v1/common/file/$fileId'),
       headers: headers,
     );
 
@@ -115,13 +113,55 @@ class _ReportDetailsState extends State<ReportDetails> {
     }
   }
 
-  void downloadFile(String fileUrl) async {
-    if (await canLaunchUrl(Uri.parse(fileUrl))) {
-      await launchUrl(Uri.parse(fileUrl));
-    } else {
-      throw 'Could not launch $fileUrl';
+  
+void downloadAndOpenFile(String fileUrl) async {
+  final file = await _fetchFile(fileUrl);
+  if (file != null) {
+    final result = await OpenFile.open(file.path);
+    if (result.type != ResultType.done) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('Failed to open the file.')),
+      );
     }
+  } else {
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(content: Text('Failed to download the file.')),
+    );
   }
+}
+
+Future<File?> _fetchFile(String fileUrl) async {
+  try {
+    final response = await http.get(Uri.parse(fileUrl));
+    if (response.statusCode == 200) {
+      final bytes = response.bodyBytes;
+
+      // Getting the Downloads directory path
+      Directory downloadsDirectory = (await getExternalStorageDirectory())!;
+      String downloadsPath = downloadsDirectory.path;
+
+      // Path for a subfolder inside the Downloads directory for the app
+      String appFolderPath = p.join(downloadsPath, 'OmnicommFiles');
+
+      final appDirectory = Directory(appFolderPath);
+      if (!await appDirectory.exists()) {
+        await appDirectory.create(recursive: true);
+      }
+
+      // Define the file path and write the file as bytes.
+      final filePath = p.join(appDirectory.path, p.basename(fileUrl));
+      final file = File(filePath);
+      await file.writeAsBytes(bytes);
+
+      return file;
+    }
+  } catch (e) {
+    print('Error downloading file: $e');
+  }
+  return null;
+}
+
+
 
   @override
   Widget build(BuildContext context) {
@@ -163,7 +203,7 @@ class _ReportDetailsState extends State<ReportDetails> {
                             title: Text(reportFile.name),
                             trailing: IconButton(
                               icon: Icon(Icons.download),
-                              onPressed: () => downloadFile(reportFile.fileUrl),
+                              onPressed: () => downloadAndOpenFile(reportFile.fileUrl),
                             ),
                           );
                         }).toList(),
@@ -174,31 +214,31 @@ class _ReportDetailsState extends State<ReportDetails> {
                         padding: const EdgeInsets.all(8.0),
                         child: Text('Recipients: ${report.recipients.join(', ')}'),
                       ),
-                      DropdownButtonFormField<int>(
-                    value: selectedStatus,
-                    items: status.entries
-                        .map<DropdownMenuItem<int>>((entry) => DropdownMenuItem(
-                              value: int.parse(entry.key),
-                              child: Text(entry.value),
-                            ))
-                        .toList(),
-                    onChanged: (int? newValue) {
-                      if (newValue != null) {
-                        setState(() {
-                          selectedStatus = newValue;
-                        });
-                        updateStatus(report.id, newValue);
-                      }
-                    },
-                    decoration: InputDecoration(
-                      labelText: "Update Status",
-                      filled: true,
-                      fillColor: Colors.white,
-                      border: OutlineInputBorder(
-                        borderRadius: BorderRadius.circular(10.0),
-                      ),
-                    ),
-                  ),
+                    // DropdownButtonFormField<int>(
+                    //     value: selectedStatus,
+                    //     items: status.entries
+                    //         .map<DropdownMenuItem<int>>((entry) => DropdownMenuItem(
+                    //               value: int.parse(entry.key),
+                    //               child: Text(entry.value),
+                    //             ))
+                    //         .toList(),
+                    //     onChanged: (int? newValue) {
+                    //       if (newValue != null) {
+                    //         setState(() {
+                    //           selectedStatus = newValue;
+                    //         });
+                    //         updateStatus(report.id, newValue);
+                    //       }
+                    //     },
+                    //     decoration: InputDecoration(
+                    //       labelText: "Update Status",
+                    //       filled: true,
+                    //       fillColor: Colors.white,
+                    //       border: OutlineInputBorder(
+                    //         borderRadius: BorderRadius.circular(10.0),
+                    //       ),
+                    //     ),
+                    // ),
                   ],
                 ),
               ),
@@ -219,7 +259,7 @@ class Report {
   DateTime createdAt;
   DateTime updatedAt;
   DateTime? deletedAt;
-  String deadline;
+  DateTime deadline;
   int status;
 
   Report({
@@ -236,19 +276,20 @@ class Report {
   });
 
   factory Report.fromJson(Map<String, dynamic> json) {
+    var fileIds = json['files'] as List<dynamic>?;
+    var recipientsList = json['recipients'] as List<dynamic>?;
+
     return Report(
-      id: json['id'] as int,
-      title: json['title'] as String,
-      text: json['text'] as String,
-      files: (json['files'] as List<dynamic>)
-          .map((fileId) => ReportFile.fromId(fileId as int))
-          .toList(),
-      recipients: List<String>.from(json['recipients']),
-      createdAt: DateTime.parse(json['created_at']),
-      updatedAt: DateTime.parse(json['updated_at']),
+      id: json['id'] ?? -1, // Provide a default id
+      title: json['title'] ?? 'No title provided', // Provide a default title
+      text: json['text'] ?? 'No text provided', // Provide a default text
+      files: fileIds != null ? List<ReportFile>.from(fileIds.map((fileId) => ReportFile.fromId(fileId)).toList()) : [],
+      recipients: recipientsList != null ? List<String>.from(recipientsList) : [],
+      createdAt: json['created_at'] != null ? DateTime.parse(json['created_at']) : DateTime.now(),
+      updatedAt: json['updated_at'] != null ? DateTime.parse(json['updated_at']) : DateTime.now(),
       deletedAt: json['deleted_at'] != null ? DateTime.parse(json['deleted_at']) : null,
-      deadline: json['deadline'],
-      status: json['status'] as int,
+      deadline: json['deadline'] != null ? DateTime.parse(json['deadline']) : DateTime.now(),
+      status: json['status'] ?? 0,
     );
   }
 }
@@ -264,19 +305,32 @@ class ReportFile {
     required this.fileUrl,
   });
 
-  factory ReportFile.fromJson(Map<String, dynamic> json) {
-    return ReportFile(
-      id: json['id'] as int,
-      name: json['name'] as String,
-      fileUrl: json['file'] as String,
+  static Future<ReportFile> fromId(int id) async {
+    // Perform your logic to get the file details based on the ID
+    final response = await http.get(
+      Uri.parse('$protocol://$domain/api/v1/common/file/$id'),
+      headers: headers,
     );
+
+    if (response.statusCode == 200) {
+      return ReportFile.fromJson(json.decode(response.body));
+    } else {
+      return ReportFile(
+        id: id,
+        name: 'File $id',
+        fileUrl: 'default/path',
+      );
+    }
   }
 
-  factory ReportFile.fromId(int id) {
+  factory ReportFile.fromJson(Map<String, dynamic> json) {
+    String defaultFileUrl = json['file'] ?? 'default/path';
+    String fileName = defaultFileUrl.split('/').last;
+
     return ReportFile(
-      id: id,
-      name: 'File $id',
-      fileUrl: 'path/to/file/$id',
+      id: json['id'] ?? -1, 
+      name: fileName,
+      fileUrl: defaultFileUrl, 
     );
   }
 }
